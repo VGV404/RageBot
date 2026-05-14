@@ -35,16 +35,27 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # --- FUNÇÕES DE SUPORTE ---
 
 def buscar_e_traduzir():
-    """Função síncrona para buscar o insulto e traduzir."""
+    # Simulando um navegador para evitar bloqueios de IP de servidor
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
     try:
-        response = requests.get(URL_API, timeout=10)
-        original = response.json().get('insult', 'Error')
+        response = requests.get(URL_API, headers=headers, timeout=10)
         
-        # Traduzindo do inglês para o português
+        # Se não retornar 200 (OK), não tentamos ler o JSON
+        if response.status_code != 200:
+            print(f"A API retornou erro {response.status_code}. Talvez o IP da Railway esteja bloqueado.")
+            return "O servidor de insultos está bloqueado para mim no momento."
+
+        dados = response.json()
+        original = dados.get('insult', 'Error')
+        
+        # Tradução
         traducao = GoogleTranslator(source='en', target='pt').translate(original)
         return traducao
     except Exception as e:
-        print(f"Erro na integração: {e}")
+        print(f"Erro inesperado: {e}")
         return "Não consegui pensar em um insulto agora, você deu sorte."
 
 async def obter_insulto_async():

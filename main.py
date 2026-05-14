@@ -5,6 +5,7 @@ import random
 import asyncio
 from datetime import time, timezone, timedelta
 from deep_translator import GoogleTranslator
+import time
 
 import os
 from dotenv import load_dotenv
@@ -44,11 +45,12 @@ def buscar_e_traduzir():
     }
     
     try:
-        response = requests.get(URL_API, headers=headers, timeout=10)
+        url_com_cache_bust = f"{URL_API}&_={int(time.time())}"
+        response = requests.get(url_com_cache_bust, headers=headers, timeout=10)
         
         # Se não retornar 200 (OK), não tentamos ler o JSON
         if response.status_code != 200:
-            print(f"A API retornou erro {response.status_code}. Talvez o IP da Railway esteja bloqueado.")
+            print(f"A API retornou erro {response.status_code}. Talvez o IP da servidor esteja bloqueado.")
             return "O servidor de insultos está bloqueado para mim no momento."
 
         dados = response.json()

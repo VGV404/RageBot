@@ -55,7 +55,7 @@ async def obter_insulto_async():
 # --- TAREFA AGENDADA (2x AO DIA) ---
 
 # Defina os horários (ex: 10:00 e 22:00)
-horarios = [time(hour=10, minute=0), time(hour=22, minute=0)]
+horarios = [time(hour=13, minute=0), time(hour=16, minute=59)]
 
 @tasks.loop(time=horarios)
 async def tarefa_agendada():

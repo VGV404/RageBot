@@ -5,7 +5,7 @@ import random
 import asyncio
 from datetime import time, timezone, timedelta
 from deep_translator import GoogleTranslator
-import time
+import time as time_module
 
 import os
 from dotenv import load_dotenv
@@ -45,7 +45,7 @@ def buscar_e_traduzir():
     }
     
     try:
-        url_com_cache_bust = f"{URL_API}&_={int(time.time())}"
+        url_com_cache_bust = f"{URL_API}&_={int(time_module.time())}"
         response = requests.get(url_com_cache_bust, headers=headers, timeout=10)
         
         # Se não retornar 200 (OK), não tentamos ler o JSON
@@ -70,12 +70,10 @@ async def obter_insulto_async():
 
 # --- TAREFA AGENDADA (2x AO DIA) ---
 
-# Defina os horários (ex: 10:00 e 22:00)
 horarios = [
     time(hour=13, minute=0, tzinfo=fuso_horario), 
     time(hour=17, minute=0, tzinfo=fuso_horario),
-    time(hour=18, minute=30, tzinfo=fuso_horario),
-    time(hour=20, minute=0, tzinfo=fuso_horario),
+    time(hour=21, minute=0, tzinfo=fuso_horario),
 ]
 
 @tasks.loop(time=horarios)

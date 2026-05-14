@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 import requests
 import random
 import asyncio
-from datetime import time
+from datetime import time, timezone, timedelta
 from deep_translator import GoogleTranslator
 
 import os
@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 
 # --- CONFIGURAÇÕES ---
 # Carrega o arquivo .env apenas se ele existir (útil para testes locais)
+# Define o fuso horário (Brasília é UTC-3)
+fuso_horario = timezone(timedelta(hours=-3))
+
 load_dotenv()
 
 # Busca as informações das variáveis de ambiente
@@ -66,22 +69,30 @@ async def obter_insulto_async():
 # --- TAREFA AGENDADA (2x AO DIA) ---
 
 # Defina os horários (ex: 10:00 e 22:00)
-horarios = [time(hour=13, minute=0), time(hour=16, minute=59)]
+horarios = [
+    time(hour=13, minute=0, tzinfo=fuso_horario), 
+    time(hour=17, minute=0, tzinfo=fuso_horario),
+    time(hour=18, minute=30, tzinfo=fuso_horario),
+    time(hour=20, minute=0, tzinfo=fuso_horario),
+]
 
 @tasks.loop(time=horarios)
 async def tarefa_agendada():
     canal = bot.get_channel(ID_DO_CANAL)
     if not canal:
-        return
+        canal = await bot.fetch_channel(ID_DO_CANAL)
+
+    insulto_pt = await obter_insulto_async()
 
     # Filtra membros que não são bots
     membros = [m for m in canal.guild.members if not m.bot]
     
     if membros:
         escolhido = random.choice(membros)
-        insulto_pt = await obter_insulto_async()
-        
         await canal.send(f"🚨 **Atenção {escolhido.mention}!**\n> {insulto_pt}")
+    else:
+        # Se não encontrar ninguém específico, marca todo mundo
+        await canal.send(f"🚨 **Atenção @everyone!**\n> {insulto_pt}")
 
 # --- COMANDOS E EVENTOS ---
 

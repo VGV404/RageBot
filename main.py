@@ -34,7 +34,7 @@ intents = discord.Intents.default()
 intents.members = True 
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents, chunk_guilds_at_startup=True)
 
 # --- FUNÇÕES DE SUPORTE ---
 
@@ -83,12 +83,16 @@ async def tarefa_agendada():
         canal = await bot.fetch_channel(ID_DO_CANAL)
 
     insulto_pt = await obter_insulto_async()
+    # Força a busca de todos os membros do servidor via rede
+    # Isso garante que mesmo quem está offline apareça na lista
+    guild = canal.guild
+    todos_membros = []
+    async for membro in guild.fetch_members(limit=None):
+        if not membro.bot:
+            todos_membros.append(membro)
 
-    # Filtra membros que não são bots
-    membros = [m for m in canal.guild.members if not m.bot]
-    
-    if membros:
-        escolhido = random.choice(membros)
+    if todos_membros:
+        escolhido = random.choice(todos_membros)
         await canal.send(f"🚨 **Atenção {escolhido.mention}!**\n> {insulto_pt}")
     else:
         # Se não encontrar ninguém específico, marca todo mundo

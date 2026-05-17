@@ -110,6 +110,12 @@ async def on_ready():
 @commands.cooldown(1, 90, commands.BucketType.user) # 1 uso a cada 90s por pessoa
 async def enviar_direto(ctx, membro: discord.Member):
     """Envia um insulto traduzido para o membro mencionado."""
+    if membro == bot.user:
+        async with ctx.typing():
+            insulto_pt = await obter_insulto_async()
+            # Inverte o alvo: menciona quem enviou a mensagem (ctx.author)
+            await ctx.send(f"Achou que ia me usar contra mim mesmo, {ctx.author.mention}? Toma essa:\n> {insulto_pt}")
+        return # Para a execução aqui para não rodar o código de baixo
     async with ctx.typing(): # Mostra "Digitando..." enquanto traduz
         insulto_pt = await obter_insulto_async()
         await ctx.send(f"Ei {membro.mention}, o {ctx.author.display_name} mandou te dizer:\n> {insulto_pt}")

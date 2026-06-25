@@ -1,34 +1,24 @@
 import discord
 from discord.ext import commands, tasks
-import requests
 import random
-import asyncio
-from datetime import time, timezone, timedelta
-from deep_translator import GoogleTranslator
-import time as time_module
-
+import json
 import os
+from datetime import time, timezone, timedelta
 from dotenv import load_dotenv
 
 # --- CONFIGURAÇÕES ---
-# Carrega o arquivo .env apenas se ele existir (útil para testes locais)
-# Define o fuso horário (Brasília é UTC-3)
 fuso_horario = timezone(timedelta(hours=-3))
 
 load_dotenv()
 
-# Busca as informações das variáveis de ambiente
-# O primeiro argumento é o nome da variável na Railway
-# O segundo é um valor padrão caso não encontre (opcional)
 TOKEN = os.getenv('DISCORD_TOKEN')
 ID_DO_CANAL = int(os.getenv('DISCORD_CHANNEL_ID', '0')) 
-URL_API = "https://evilinsult.com/generate_insult.php?lang=en&type=json"
+CAMINHO_JSON = 'insultos.json'
 
-# Verificação de segurança para garantir que as variáveis foram carregadas
+# Verificação de segurança
 if not TOKEN or ID_DO_CANAL == 0:
     print("ERRO: As variáveis DISCORD_TOKEN ou DISCORD_CHANNEL_ID não foram configuradas!")
     exit()
-
 
 intents = discord.Intents.default()
 intents.members = True 
@@ -38,37 +28,29 @@ bot = commands.Bot(command_prefix='!', intents=intents, chunk_guilds_at_startup=
 
 # --- FUNÇÕES DE SUPORTE ---
 
-def buscar_e_traduzir():
-    # Simulando um navegador para evitar bloqueios de IP de servidor
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-    
+def obter_insulto_local(categoria="gerais"):
+    """Lê o arquivo JSON local e retorna um insulto aleatório da categoria especificada."""
     try:
-        url_com_cache_bust = f"{URL_API}&_={int(time_module.time())}"
-        response = requests.get(url_com_cache_bust, headers=headers, timeout=10)
-        
-        # Se não retornar 200 (OK), não tentamos ler o JSON
-        if response.status_code != 200:
-            print(f"A API retornou erro {response.status_code}. Talvez o IP da servidor esteja bloqueado.")
-            return "O servidor de insultos está bloqueado para mim no momento."
+        if not os.path.exists(CAMINHO_JSON):
+            return "Erro: O arquivo de insultos sumiu do servidor!"
 
-        dados = response.json()
-        original = dados.get('insult', 'Error')
+        with open(CAMINHO_JSON, 'r', encoding='utf-8') as f:
+            dados = json.load(f)
         
-        # Tradução
-        traducao = GoogleTranslator(source='en', target='pt').translate(original)
-        return traducao
-    except Exception as e:
-        print(f"Erro inesperado: {e}")
+        # Garante que a categoria existe e não está vazia
+        if categoria in dados and dados[categoria]:
+            return random.choice(dados[categoria])
+        
+        # Fallback caso a categoria específica falhe mas a 'gerais' exista
+        if "gerais" in dados and dados["gerais"]:
+            return random.choice(dados["gerais"])
+            
         return "Não consegui pensar em um insulto agora, você deu sorte."
+    except Exception as e:
+        print(f"Erro ao ler o arquivo JSON: {e}")
+        return "Tive um piripaque no meu banco de dados de insultos."
 
-async def obter_insulto_async():
-    """Roda a função síncrona em uma thread separada para não travar o bot."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, buscar_e_traduzir)
-
-# --- TAREFA AGENDADA (2x AO DIA) ---
+# --- TAREFA AGENDADA (3x AO DIA) ---
 
 horarios = [
     time(hour=13, minute=0, tzinfo=fuso_horario), 
@@ -82,9 +64,9 @@ async def tarefa_agendada():
     if not canal:
         canal = await bot.fetch_channel(ID_DO_CANAL)
 
-    insulto_pt = await obter_insulto_async()
-    # Força a busca de todos os membros do servidor via rede
-    # Isso garante que mesmo quem está offline apareça na lista
+    # Usa a lista "gerais" para o envio automático por padrão
+    insulto = obter_insulto_local("gerais")
+    
     guild = canal.guild
     todos_membros = []
     async for membro in guild.fetch_members(limit=None):
@@ -93,10 +75,9 @@ async def tarefa_agendada():
 
     if todos_membros:
         escolhido = random.choice(todos_membros)
-        await canal.send(f"🚨 **Atenção {escolhido.mention}!**\n> {insulto_pt}")
+        await canal.send(f"🚨 **Atenção {escolhido.mention}!**\n> {insulto}")
     else:
-        # Se não encontrar ninguém específico, marca todo mundo
-        await canal.send(f"🚨 **Atenção @everyone!**\n> {insulto_pt}")
+        await canal.send(f"🚨 **Atenção @everyone!**\n> {insulto}")
 
 # --- COMANDOS E EVENTOS ---
 
@@ -109,16 +90,14 @@ async def on_ready():
 @bot.command(name='enviar')
 @commands.cooldown(1, 90, commands.BucketType.user) # 1 uso a cada 90s por pessoa
 async def enviar_direto(ctx, membro: discord.Member):
-    """Envia um insulto traduzido para o membro mencionado."""
+    """Envia um insulto da lista 'gerais' para o membro mencionado."""
     if membro == bot.user:
-        async with ctx.typing():
-            insulto_pt = await obter_insulto_async()
-            # Inverte o alvo: menciona quem enviou a mensagem (ctx.author)
-            await ctx.send(f"Achou que ia me usar contra mim mesmo, {ctx.author.mention}? Toma essa:\n> {insulto_pt}")
-        return # Para a execução aqui para não rodar o código de baixo
-    async with ctx.typing(): # Mostra "Digitando..." enquanto traduz
-        insulto_pt = await obter_insulto_async()
-        await ctx.send(f"Ei {membro.mention}, o {ctx.author.display_name} mandou te dizer:\n> {insulto_pt}")
+        insulto = obter_insulto_local("gerais")
+        await ctx.send(f"Achou que ia me usar contra mim mesmo, {ctx.author.mention}? Toma essa:\n> {insulto}")
+        return
+
+    insulto = obter_insulto_local("gerais")
+    await ctx.send(f"Ei {membro.mention}, o {ctx.author.display_name} mandou te dizer:\n> {insulto}")
 
 # --- TRATAMENTO DE ERROS ---
 
